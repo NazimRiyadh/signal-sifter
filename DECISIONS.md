@@ -1,135 +1,277 @@
-# Engineering Decisions
+# Development Notes and Reflections
 
-## 1. Data Loading Strategy
+## Time Spent
 
-The input dataset contains multiple JSON files with inconsistent quality. The loader was designed to process files independently so that one problematic file does not stop the entire pipeline.
+Approximately **4.30 hours** were spent completing this assessment.
 
-The loader:
-- Reads all JSON files from the provided input directory.
-- Attempts multiple encodings (`utf-8`, `utf-8-sig`, and `latin-1`) to handle recoverable encoding issues.
-- Skips files with invalid JSON syntax while continuing the remaining processing.
 
-This approach prioritizes pipeline reliability over failing completely because of a single corrupted input file.
+The implementation took slightly longer than initially estimated because understanding variations in the input data and deciding how to handle edge cases required additional investigation.
 
 ---
 
-## 2. Data Validation and Normalization
+# Key Decisions and Rationale
 
-The raw listings contain different field names and formats. To create a consistent internal representation, all records are converted into a common `Product` model using Pydantic.
+## 1. Modular Project Structure
 
-Examples of normalization decisions:
+The application was separated into dedicated modules:
 
-- Product name fields:
-  - `title`
-  - `name`
-  - `product_name`
+* `loader.py`
+* `normalizer.py`
+* `models.py`
+* `deduplicator.py`
+* `scorer.py`
+* `reporter.py`
 
-  are mapped into a single `name` field.
+This was chosen instead of implementing the entire pipeline in a single script because each module has a distinct responsibility.
 
-- Install count fields:
-  - `installs`
-  - `install_count`
-  - nested `stats.installs`
+The modular structure improves:
 
-  are converted into an integer value.
-
-- Rating fields:
-  - `rating`
-  - `stars`
-  - `score`
-
-  are converted into a floating-point value.
-
-- Date fields are converted into a consistent Python `date` object.
-
-Missing numeric values are assigned default values to allow consistent scoring.
+* Readability
+* Maintainability
+* Testability
+* Separation of concerns
+* Future extensibility
 
 ---
 
-## 3. Duplicate Detection Strategy
+## 2. Handling Invalid and Inconsistent Input Files
 
-Duplicate products were identified using normalized product names.
+The dataset contains files with different types of issues.
 
-The normalization process:
-- Converts names to lowercase.
-- Removes extra whitespace.
-- Creates a consistent comparison key.
+### Encoding Problems
 
-Example:
+For encoding-related problems, the loader attempts multiple encodings:
 
+1. UTF-8
+2. UTF-8 with BOM
+3. Latin-1
 
-"Cache Rocket"
-"cache rocket "
-"CACHE ROCKET"
+This approach allows potentially recoverable encoding issues to be handled without stopping the entire pipeline.
 
+### Invalid JSON
+
+Structurally invalid JSON files are not automatically repaired.
+
+Instead, they are:
+
+1. Detected
+2. Logged for review
+3. Skipped
+4. Excluded from further processing
+
+Automatic repair was intentionally avoided because reconstructing corrupted data without knowing the original intended value could introduce inaccurate information.
+
+---
+
+## 3. Normalization Strategy
+
+The raw dataset uses different field names for similar concepts.
+
+Examples include:
+
+| Raw Fields                                         | Internal Field |
+| -------------------------------------------------- | -------------- |
+| `title`, `name`, `product_name`                    | `name`         |
+| `installs`, `install_count`, nested install values | `installs`     |
+| `rating`, `stars`, `score`                         | `rating`       |
+
+A dedicated normalization layer converts these variations into a consistent internal representation.
+
+This allows downstream components to operate on a predictable data model rather than handling multiple possible field formats.
+
+---
+
+## 4. Duplicate Handling
+
+The brief required duplicate removal but did not define a specific duplicate-identification strategy.
+
+I chose **normalized product names** as the primary duplicate key because a universal unique identifier was not guaranteed across all records.
+
+Normalization includes:
+
+* Converting names to lowercase
+* Removing leading and trailing whitespace
+* Normalizing whitespace
+
+For example:
+
+```text
+Cache Rocket
+cache rocket
+CACHE ROCKET
+```
 
 are treated as the same product.
 
-When duplicates are found, the stronger listing based on engagement signals is retained.
+When duplicate records are found, the record with stronger engagement signals is retained.
 
-This approach was chosen because the dataset does not provide a guaranteed universal product identifier.
+### Future Improvement
 
----
+With additional time, I would explore more advanced duplicate detection techniques, such as:
 
-## 4. Scoring Strategy
+* String similarity
+* Token-based similarity
+* Fuzzy matching
+* Embedding-based similarity
 
-The ranking score represents product strength using three main signals:
-
-- Installation popularity
-- User rating
-- Review volume
-
-The score is calculated using:
-
-
-Install points + Rating points + Review points
-
-
-To avoid extremely large products dominating the ranking:
-
-- Installation points are capped.
-- Review points are capped.
-
-Products that have not been updated within the defined stale period receive a score of zero.
+These approaches could identify duplicates even when product names differ more substantially.
 
 ---
 
-## 5. Report Generation
+## 5. Scoring Approach
 
-The system produces two outputs:
+The brief required products to be ranked but did not prescribe a specific scoring formula.
 
-### report.json
+The implementation combines three primary signals:
 
-Designed for machine consumption and further processing.
+* Installation count
+* User rating
+* Review volume
 
-### report.txt
+The scoring system is deterministic and transparent, making the resulting ranking easy to understand and reproduce.
 
-Designed for human readability.
+Limits are also applied to selected components so that extremely large products do not dominate the ranking solely because of one metric.
 
-The final report contains the top-ranked products sorted by descending score.
-
----
-
-## 6. Error Handling Philosophy
-
-The pipeline follows a "continue processing where possible" approach.
-
-Recoverable issues:
-- Encoding problems → try alternative encodings.
-
-Non-recoverable issues:
-- Invalid JSON structure → skip the file.
-
-This prevents a single bad input from breaking the entire analysis.
+For stale products, the implementation follows the brief's requirement by assigning a score of zero when the product has not been updated within the defined recency window.
 
 ---
 
-## 7. Use of AI Assistance
+## Advanced Duplicate Detection
 
-AI tools were used as a development assistant for:
-- Understanding project requirements.
-- Discussing Python implementation approaches.
-- Debugging errors during development.
-- Reviewing code structure.
+The current implementation primarily relies on normalized names.
 
-All generated suggestions were reviewed, modified where necessary, and tested before being included in the final implemen
+A future version could incorporate fuzzy matching or semantic similarity to identify records with significantly different but equivalent names.
+
+---
+
+# Ambiguities and Interpretation
+
+## Duplicate Definition
+
+The brief did not explicitly specify how duplicate products should be identified.
+
+Normalized product names were selected because they provide a simple, deterministic strategy without relying on a unique identifier that may not be consistently available.
+
+---
+
+## Missing Values
+
+The brief did not fully define how missing numerical values should be handled.
+
+Default values are used where appropriate so that the scoring pipeline can operate consistently without allowing individual incomplete records to terminate the entire process.
+
+---
+
+## Scoring Formula
+
+The brief provided flexibility regarding ranking methodology.
+
+I selected a transparent deterministic scoring method rather than a more complex machine-learning-based ranking model because:
+
+* The dataset is relatively small
+* The ranking should be explainable
+* The scoring behavior should be reproducible
+* There is no labeled ranking dataset available for supervised calibration
+
+---
+
+# AI Usage
+
+AI tools were used during development as a **learning, debugging, and problem-solving assistant**.
+
+AI assistance was used for:
+
+* Understanding assessment requirements
+* Exploring project structure
+* Learning Pydantic concepts
+* Debugging Python errors
+* Discussing implementation approaches
+* Reviewing edge-case handling
+
+The resulting implementation was reviewed, adapted, and tested as part of the development process.
+
+Examples of improvements made during development include:
+
+* Adding fallback encoding support for recoverable input files
+* Logging malformed files instead of silently ignoring them
+* Improving duplicate handling
+* Configuring pytest correctly for the project structure
+* Adding documentation for engineering decisions
+
+The final behavior was verified by running the complete processing pipeline against the provided dataset.
+
+---
+
+# New Skills Learned
+
+## Pydantic
+
+I learned how to use Pydantic models to validate and standardize structured data.
+
+## Python Project Organization
+
+I gained practical experience organizing a Python application into modules with clearly separated responsibilities.
+
+## Data Pipeline Design
+
+I gained experience designing an end-to-end data processing workflow:
+
+```text
+Raw Data
+   ↓
+Loading
+   ↓
+Normalization
+   ↓
+Validation
+   ↓
+Deduplication
+   ↓
+Scoring
+   ↓
+Ranking
+   ↓
+Reporting
+```
+
+---
+
+# Additional Work Completed
+
+Although not explicitly required, several additional improvements were implemented.
+
+## Automated Tests
+
+Tests were added for important parts of the pipeline, including:
+
+* File loading
+* Data normalization
+* Duplicate removal
+* Score calculation
+
+These tests provide confidence that future changes do not unintentionally break existing functionality.
+
+---
+
+## Error Logging
+
+Instead of silently ignoring problematic input files, the application records files that require review along with the reason they could not be processed.
+
+This improves:
+
+* Transparency
+* Debuggability
+* Data-quality monitoring
+* Reproducibility
+
+The pipeline can therefore continue processing valid data while preserving an audit trail of problematic inputs.
+
+---
+
+# Final Reflection
+
+The assessment provided practical experience in building a small but complete data-processing system rather than focusing only on individual algorithms.
+
+The main engineering lesson was that **real-world input data is rarely perfectly clean**. Designing the pipeline to handle inconsistent fields, duplicate records, encoding problems, malformed files, and missing values was therefore as important as implementing the core scoring logic.
+
+The resulting system prioritizes **modularity, transparency, fault tolerance, and reproducibility**, while leaving clear opportunities for future improvements.

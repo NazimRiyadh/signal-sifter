@@ -1,10 +1,5 @@
 from signal_sifter.loader import load_json_files
 
-
-products = load_json_files("data")
-
-
-print("Total files:", len(products))
-
-
-print(products[0])
+def test_loader_reads_files():
+    products = load_json_files("data")
+    assert len(products) > 0

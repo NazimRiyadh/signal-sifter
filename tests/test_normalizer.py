@@ -1,7 +1,16 @@
-from signal_sifter.loader import load_json_files
 from signal_sifter.normalizer import normalize
 
-raw_products = load_json_files("data")
-product = normalize(raw_products[0])
+def test_normalizer_converts_fields():
+    raw = {
+        "title": "Test Plugin",
+        "installs": "18,300",
+        "rating": "4.5",
+        "reviews": "500"
+    }
 
-print(product)
+    product = normalize(raw)
+
+    assert product.name == "Test Plugin"
+    assert product.installs == 18300
+    assert product.rating == 4.5
+    assert product.reviews == 500

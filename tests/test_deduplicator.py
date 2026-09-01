@@ -1,19 +1,20 @@
-from signal_sifter.loader import load_json_files
-from signal_sifter.normalizer import normalize
+from signal_sifter.models import Product
 from signal_sifter.deduplicator import deduplicate
 
-raw_products = load_json_files("data")
 
-products = [
-    normalize(item)
-    for item in raw_products
-]
+def test_duplicate_products_removed():
 
-print("Before:", len(products))
+    products = [
+        Product(
+            name="Cache Rocket",
+            installs=1000
+        ),
 
-unique_products = deduplicate(products)
+        Product(
+            name="cache rocket",
+            installs=2000
+        )
+    ]
 
-print("After:", len(unique_products))
-
-for product in unique_products:
-    print(product.name)
+    result = deduplicate(products)
+    assert len(result) == 1

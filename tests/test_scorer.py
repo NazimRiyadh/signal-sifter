@@ -1,12 +1,19 @@
-from signal_sifter.loader import load_json_files
-from signal_sifter.normalizer import normalize
+from datetime import date
+
+from signal_sifter.models import Product
 from signal_sifter.scorer import calculate_score
 
-raw_products = load_json_files("data")
+def test_product_score():
 
-product = normalize(raw_products[0])
+    product = Product(
 
-score = calculate_score(product)
+        name="Test Plugin",
+        installs=10000,
+        rating=4.5,
+        reviews=500,
+        last_updated=date(2026, 8, 1)
 
-print(product.name)
-print(score)
+    )
+
+    score = calculate_score(product)
+    assert score > 0

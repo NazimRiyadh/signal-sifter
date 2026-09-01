@@ -14,4 +14,13 @@ def deduplicate(products):
         if key not in unique_products:
             unique_products[key] = product
 
+        else:
+            existing = unique_products[key]
+
+            if (
+                product.installs > existing.installs
+                or product.reviews > existing.reviews
+            ):
+                unique_products[key] = product
+
     return list(unique_products.values())

@@ -1,1 +1,37 @@
-venv
+# Python virtual environment
+venv/
+.venv/
+
+# Python cache files
+__pycache__/
+*.py[cod]
+
+# Pytest cache
+.pytest_cache/
+
+# Coverage reports
+.coverage
+htmlcov/
+
+# IDE settings
+.vscode/
+.idea/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Generated reports
+report/
+
+# Temporary files
+*.log
+*.tmp
+
+# Build/package files
+build/
+dist/
+*.egg-info/
+
+# Environment variables
+.env
